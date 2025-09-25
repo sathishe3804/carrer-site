@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Details</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .slot.active {
+      background-color: #198754;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container my-5">
+    <!-- Job details -->
+    <div id="job-detail" class="mb-4">
+      <p>Loading job details...</p>
+    </div>
+
+    <!-- Apply Section (hidden initially) -->
+    <div id="apply-section" style="display:none;">
+      <h3>Apply for this Job</h3>
+      <form id="applyForm">
+        <div class="mb-3">
+          <input type="text" id="firstName" class="form-control" placeholder="First Name" required>
+        </div>
+        <div class="mb-3">
+          <input type="text" id="lastName" class="form-control" placeholder="Last Name" required>
+        </div>
+        <div class="mb-3">
+          <input type="email" id="email" class="form-control" placeholder="Email" required>
+        </div>
+        <div class="mb-3">
+          <input type="text" id="phone" class="form-control" placeholder="Phone" required>
+        </div>
+        <div class="mb-3">
+          <select id="gender" class="form-select">
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <input type="text" id="city" class="form-control" placeholder="City">
+        </div>
+        <div class="mb-3">
+          <input type="text" id="position" class="form-control" placeholder="Position" required>
+        </div>
+        <div class="mb-3">
+          <label>Start Date</label>
+          <input type="date" id="startDate" class="form-control">
+        </div>
+        <div class="mb-3">
+          <label>Interview Date</label>
+          <input type="date" id="interviewDate" class="form-control">
+        </div>
+        <div class="mb-3">
+          <input type="text" id="resume" class="form-control" placeholder="Resume link" required>
+        </div>
+
+        <!-- Slots -->
+        <div class="mb-3">
+          <p>Select Interview Slot:</p>
+          <button type="button" class="slot btn btn-outline-primary me-2">9AM</button>
+          <button type="button" class="slot btn btn-outline-primary me-2">11AM</button>
+          <button type="button" class="slot btn btn-outline-primary">2PM</button>
+        </div>
+
+        <button type="submit" class="btn btn-success">Submit Application</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const jobId = parseInt(urlParams.get("id"));
+    const jobDetail = document.getElementById("job-detail");
+    const applySection = document.getElementById("apply-section");
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Please login first!");
+      window.location.href = "login.html";
+    }
+
+    fetch(`http://localhost:2000/api/jobs/${jobId}`, {
+      headers: { "Authorization": "Bearer " + token }
+    })
+    .then(response => {
+      if (!response.ok) throw new Error("Unauthorized or job not found");
+      return response.json();
+    })
+    .then(job => {
+      if (job && job.id) {
+        jobDetail.innerHTML = `
+          <h2>${job.title}</h2>
+          <p class="text-muted">Company: ${job.company}</p>
+          <p class="text-muted">Location: ${job.location}</p>
+          <p>${job.description}</p>
+          <button id="applyBtn" class="btn btn-success">Apply Now</button>
+        `;
+
+        document.getElementById("applyBtn").addEventListener("click", () => {
+          applySection.style.display = "block";
+          document.getElementById("applyBtn").style.display = "none";
+        });
+      } else {
+        jobDetail.innerHTML = `<p class="text-danger">Job not found.</p>`;
+      }
+    })
+    .catch(err => {
+      console.error("Fetch error:", err);
+      jobDetail.innerHTML = `<p class="text-danger">Error loading job details. Please login again.</p>`;
+    });
+
+    // Slot selection
+    let selectedSlot = "";
+    document.querySelectorAll(".slot").forEach(slot => {
+      slot.addEventListener("click", () => {
+        document.querySelectorAll(".slot").forEach(s => s.classList.remove("active"));
+        slot.classList.add("active");
+        selectedSlot = slot.textContent;
+      });
+    });
+
+    // Form submit
+    document.getElementById("applyForm").addEventListener("submit", async e => {
+      e.preventDefault();
+
+      const firstName = document.getElementById("firstName").value.trim();
+      const lastName = document.getElementById("lastName").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const phone = document.getElementById("phone").value.trim();
+      const gender = document.getElementById("gender").value;
+      const city = document.getElementById("city").value;
+      const position = document.getElementById("position").value.trim();
+      const startDate = document.getElementById("startDate").value;
+      const interviewDate = document.getElementById("interviewDate").value;
+      const resume = document.getElementById("resume").value.trim();
+
+      if (!firstName || !lastName || !email || !phone || !position || !resume) {
+        alert("Please fill all required fields.");
+        return;
+      }
+
+      try {
+        const res = await fetch("http://localhost:2000/api/apply", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + token
+          },
+          body: JSON.stringify({
+            jobId,
+            firstName,
+            lastName,
+            email,
+            phone,
+            gender,
+            city,
+            position,
+            startDate,
+            interviewDate,
+            interviewSlot: selectedSlot,
+            resume
+          })
+        });
+
+        const data = await res.json();
+        alert(data.message);
+
+        if (res.ok) {
+          document.getElementById("applyForm").reset();
+          applySection.style.display = "none";
+          selectedSlot = "";
+          document.querySelectorAll(".slot").forEach(s => s.classList.remove("active"));
+          window.location.href = "jobs.html";
+        }
+      } catch (err) {
+        console.error("Application error:", err);
+        alert("Something went wrong while applying.");
+      }
+    });
+  });
+  </script>
+</body>
+</html>
