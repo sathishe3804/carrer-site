@@ -1,189 +1,136 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Job Details</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    .slot.active {
-      background-color: #198754;
-      color: #fff;
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apply Job</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
-  <div class="container my-5">
-    <!-- Job details -->
-    <div id="job-detail" class="mb-4">
-      <p>Loading job details...</p>
-    </div>
+<body class="bg-light">
+  <div class="container mt-4">
+    <div id="job-details" class="mb-4"></div>
 
-    <!-- Apply Section (hidden initially) -->
-    <div id="apply-section" style="display:none;">
-      <h3>Apply for this Job</h3>
-      <form id="applyForm">
-        <div class="mb-3">
-          <input type="text" id="firstName" class="form-control" placeholder="First Name" required>
+    <form id="applyForm" class="p-4 bg-white shadow rounded">
+      <h4>Apply for this job</h4>
+      <div class="row mt-3">
+        <div class="col-md-6">
+          <label>First Name</label>
+          <input type="text" class="form-control" name="firstName" required>
         </div>
-        <div class="mb-3">
-          <input type="text" id="lastName" class="form-control" placeholder="Last Name" required>
+        <div class="col-md-6">
+          <label>Last Name</label>
+          <input type="text" class="form-control" name="lastName" required>
         </div>
-        <div class="mb-3">
-          <input type="email" id="email" class="form-control" placeholder="Email" required>
+      </div>
+
+      <div class="row mt-3">
+        <div class="col-md-6">
+          <label>Email</label>
+          <input type="email" class="form-control" name="email" required>
         </div>
-        <div class="mb-3">
-          <input type="text" id="phone" class="form-control" placeholder="Phone" required>
+        <div class="col-md-6">
+          <label>Phone</label>
+          <input type="text" class="form-control" name="phone" required>
         </div>
-        <div class="mb-3">
-          <select id="gender" class="form-select">
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
+      </div>
+
+      <div class="row mt-3">
+        <div class="col-md-6">
+          <label>Gender</label>
+          <select class="form-control" name="gender">
+            <option value="">Select</option>
+            <option>Male</option>
+            <option>Female</option>
+            <option>Other</option>
           </select>
         </div>
-        <div class="mb-3">
-          <input type="text" id="city" class="form-control" placeholder="City">
+        <div class="col-md-6">
+          <label>City</label>
+          <input type="text" class="form-control" name="city" required>
         </div>
-        <div class="mb-3">
-          <input type="text" id="position" class="form-control" placeholder="Position" required>
+      </div>
+
+      <div class="row mt-3">
+        <div class="col-md-6">
+          <label>Position</label>
+          <input type="text" class="form-control" name="position" placeholder="Ex: Junior Developer" required>
         </div>
-        <div class="mb-3">
-          <label>Start Date</label>
-          <input type="date" id="startDate" class="form-control">
+        <div class="col-md-6">
+          <label>Interview Slot</label>
+          <input type="text" class="form-control" name="interviewSlot" placeholder="Ex: 10:30 AM - 11:00 AM">
         </div>
-        <div class="mb-3">
+      </div>
+
+      <div class="row mt-3">
+        <div class="col-md-6">
           <label>Interview Date</label>
-          <input type="date" id="interviewDate" class="form-control">
+          <input type="date" class="form-control" name="interviewDate">
         </div>
-        <div class="mb-3">
-          <input type="text" id="resume" class="form-control" placeholder="Resume link" required>
+        <div class="col-md-6">
+          <label>Resume Link (optional)</label>
+          <input type="text" class="form-control" name="resume" placeholder="Paste resume URL">
         </div>
+      </div>
 
-        <!-- Slots -->
-        <div class="mb-3">
-          <p>Select Interview Slot:</p>
-          <button type="button" class="slot btn btn-outline-primary me-2">9AM</button>
-          <button type="button" class="slot btn btn-outline-primary me-2">11AM</button>
-          <button type="button" class="slot btn btn-outline-primary">2PM</button>
-        </div>
-
-        <button type="submit" class="btn btn-success">Submit Application</button>
-      </form>
-    </div>
+      <input type="hidden" id="jobId" name="jobId">
+      <button type="submit" class="btn btn-primary mt-4">Submit Application</button>
+    </form>
   </div>
 
   <script>
-  document.addEventListener("DOMContentLoaded", () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const jobId = parseInt(urlParams.get("id"));
-    const jobDetail = document.getElementById("job-detail");
-    const applySection = document.getElementById("apply-section");
-
     const token = localStorage.getItem("token");
     if (!token) {
       alert("Please login first!");
       window.location.href = "login.html";
     }
 
-    fetch(`http://localhost:2000/api/jobs/${jobId}`, {
-      headers: { "Authorization": "Bearer " + token }
-    })
-    .then(response => {
-      if (!response.ok) throw new Error("Unauthorized or job not found");
-      return response.json();
-    })
-    .then(job => {
-      if (job && job.id) {
-        jobDetail.innerHTML = `
-          <h2>${job.title}</h2>
-          <p class="text-muted">Company: ${job.company}</p>
-          <p class="text-muted">Location: ${job.location}</p>
-          <p>${job.description}</p>
-          <button id="applyBtn" class="btn btn-success">Apply Now</button>
+    const params = new URLSearchParams(window.location.search);
+    const jobId = params.get("id");
+    document.getElementById("jobId").value = jobId;
+
+    // Fetch job details
+    fetch(`http://localhost:2000/api/jobs/${jobId}`)
+      .then(res => res.json())
+      .then(job => {
+        document.getElementById("job-details").innerHTML = `
+          <div class="card p-3">
+            <h3>${job.title}</h3>
+            <p><strong>Company:</strong> ${job.company}</p>
+            <p><strong>Location:</strong> ${job.location}</p>
+            <p>${job.description}</p>
+          </div>
         `;
-
-        document.getElementById("applyBtn").addEventListener("click", () => {
-          applySection.style.display = "block";
-          document.getElementById("applyBtn").style.display = "none";
-        });
-      } else {
-        jobDetail.innerHTML = `<p class="text-danger">Job not found.</p>`;
-      }
-    })
-    .catch(err => {
-      console.error("Fetch error:", err);
-      jobDetail.innerHTML = `<p class="text-danger">Error loading job details. Please login again.</p>`;
-    });
-
-    // Slot selection
-    let selectedSlot = "";
-    document.querySelectorAll(".slot").forEach(slot => {
-      slot.addEventListener("click", () => {
-        document.querySelectorAll(".slot").forEach(s => s.classList.remove("active"));
-        slot.classList.add("active");
-        selectedSlot = slot.textContent;
       });
-    });
 
-    // Form submit
-    document.getElementById("applyForm").addEventListener("submit", async e => {
+    // Submit form
+    document.getElementById("applyForm").addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      const firstName = document.getElementById("firstName").value.trim();
-      const lastName = document.getElementById("lastName").value.trim();
-      const email = document.getElementById("email").value.trim();
-      const phone = document.getElementById("phone").value.trim();
-      const gender = document.getElementById("gender").value;
-      const city = document.getElementById("city").value;
-      const position = document.getElementById("position").value.trim();
-      const startDate = document.getElementById("startDate").value;
-      const interviewDate = document.getElementById("interviewDate").value;
-      const resume = document.getElementById("resume").value.trim();
-
-      if (!firstName || !lastName || !email || !phone || !position || !resume) {
-        alert("Please fill all required fields.");
-        return;
-      }
+      const formData = new FormData(e.target);
+      const body = Object.fromEntries(formData.entries());
 
       try {
         const res = await fetch("http://localhost:2000/api/apply", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": "Bearer " + token
+            "Authorization": `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            jobId,
-            firstName,
-            lastName,
-            email,
-            phone,
-            gender,
-            city,
-            position,
-            startDate,
-            interviewDate,
-            interviewSlot: selectedSlot,
-            resume
-          })
+          body: JSON.stringify(body),
         });
 
         const data = await res.json();
-        alert(data.message);
-
-        if (res.ok) {
-          document.getElementById("applyForm").reset();
-          applySection.style.display = "none";
-          selectedSlot = "";
-          document.querySelectorAll(".slot").forEach(s => s.classList.remove("active"));
-          window.location.href = "jobs.html";
+        if (data.success) {
+          alert("Application submitted successfully!");
+          window.location.href = "index.html";
+        } else {
+          alert(data.message || "Failed to submit application.");
         }
       } catch (err) {
-        console.error("Application error:", err);
-        alert("Something went wrong while applying.");
+        alert("Error submitting form. Please try again later.");
+        console.error(err);
       }
     });
-  });
   </script>
 </body>
 </html>

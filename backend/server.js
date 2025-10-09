@@ -7,58 +7,48 @@ const jwt = require("jsonwebtoken");
 
 const app = express();
 const PORT = 2000;
-
-
-
-// Secret key (later move to .env file)
 const JWT_SECRET = "mysecretkey";
 
-// http://localhost:2000/api/signup
 // ================= JWT AUTH MIDDLEWARE =================
 function authenticateToken(req, res, next) {
-  // Get token from headers
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Expect: "Bearer <token>"
-
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
   if (!token) return res.status(401).json({ message: "Access denied" });
 
-  // Verify token
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) return res.status(403).json({ message: "Invalid token" });
-
-    req.user = user; // Save token payload (id, role) in request
-    next(); // continue to route
+    req.user = user;
+    next();
   });
 }
-
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "../public")));
 
-
 // Connect to MySQL
 const db = mysql.createConnection({
   host: "localhost",
   user: "root",
-  password: "Sathish@3804", // your password
-  database: "career_site"
+  password: "Sathish@3804",
+  database: "career_site",
 });
 
-db.connect(err => {
+db.connect((err) => {
   if (err) console.log(err);
   else console.log("✅ MySQL Connected!");
 });
 
-// Simple sanitizer
+// Sanitizer
 function sanitize(str) {
   if (!str) return "";
-  return str.replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 // ================= JOB ROUTES =================
@@ -76,22 +66,44 @@ app.get("/api/jobs/:id", (req, res) => {
   const jobId = parseInt(req.params.id);
   db.query("SELECT * FROM jobs WHERE id = ?", [jobId], (err, results) => {
     if (err) return res.status(500).send(err);
-    if (results.length === 0) res.status(404).json({ error: "Job not found" });
+    if (results.length === 0)
+      res.status(404).json({ error: "Job not found" });
     else res.json(results[0]);
   });
 });
 
-// Apply for a job
+// ================= APPLY ROUTE =================
 app.post("/api/apply", authenticateToken, (req, res) => {
-  const { firstName, lastName, email, phone, gender, city, position, startDate, interviewDate, interviewSlot, resume } = req.body;
+  const {
+    jobId,
+    firstName,
+    lastName,
+    email,
+    phone,
+    gender,
+    city,
+    position,
+    startDate,
+    interviewDate,
+    interviewSlot,
+    resume,
+  } = req.body;
+
+  const userId = req.user?.id;
+
+  if (!jobId) {
+    return res.status(400).json({ success: false, message: "Job ID required" });
+  }
 
   const query = `
     INSERT INTO applications 
-    (first_name, last_name, email, phone, gender, city, position, start_date, interview_date, interview_slot, resume)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (job_id, user_id, first_name, last_name, email, phone, gender, city, position, start_date, interview_date, interview_slot, resume)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   const values = [
+    jobId,
+    userId,
     sanitize(firstName),
     sanitize(lastName),
     sanitize(email),
@@ -101,23 +113,42 @@ app.post("/api/apply", authenticateToken, (req, res) => {
     sanitize(position),
     startDate || null,
     interviewDate || null,
-    interviewSlot || null,
-    sanitize(resume)
+    sanitize(interviewSlot),
+    sanitize(resume),
   ];
 
-  db.execute(query, values, (err, result) => {
-    if (err) return res.status(500).json({ error: "Database error" });
-    res.json({ message: "Application submitted successfully!" });
+  db.query(query, values, (err, result) => {
+    if (err) {
+      console.error("❌ DB Insert Error:", err);
+      return res.status(400).json({ success: false, message: "Something went wrong" });
+    }
+    res.json({ success: true, message: "Application submitted successfully!" });
+  });
+});
+
+// ================= APPLICATIONS ROUTE =================
+app.get("/api/applications", authenticateToken, (req, res) => {
+  const query = `
+    SELECT a.*, j.title AS job_title 
+    FROM applications a
+    JOIN jobs j ON a.job_id = j.id
+    WHERE a.user_id = ?
+    ORDER BY a.id DESC
+  `;
+  db.query(query, [req.user.id], (err, results) => {
+    if (err) {
+      console.error("❌ Fetch Applications Error:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    res.json(results);
   });
 });
 
 // ================= AUTH ROUTES =================
 
 // Signup
-// Signup
 app.post("/api/signup", (req, res) => {
   const { name, email, password } = req.body;
-
   if (!name || !email || !password) {
     return res.status(400).json({ message: "All fields are required" });
   }
@@ -129,7 +160,7 @@ app.post("/api/signup", (req, res) => {
     [name, email, password_hash],
     (err, result) => {
       if (err) {
-        console.error("SQL Error:", err); // Debug
+        console.error("SQL Error:", err);
         if (err.code === "ER_DUP_ENTRY") {
           return res.status(400).json({ message: "Email already registered" });
         }
@@ -140,14 +171,11 @@ app.post("/api/signup", (req, res) => {
   );
 });
 
-
 // Login
 app.post("/api/login", (req, res) => {
   const { email, password } = req.body;
-
-  if (!email || !password) {
+  if (!email || !password)
     return res.status(400).json({ message: "All fields are required" });
-  }
 
   db.query("SELECT * FROM users WHERE email = ?", [email], (err, results) => {
     if (err) return res.status(500).json({ message: "Error logging in" });
@@ -157,18 +185,24 @@ app.post("/api/login", (req, res) => {
     const user = results[0];
     const isMatch = bcrypt.compareSync(password, user.password_hash);
 
-    if (!isMatch) {
+    if (!isMatch)
       return res.status(400).json({ message: "Invalid credentials" });
-    }
 
-    // Generate JWT token
-    const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, {
-      expiresIn: "1h",
-    });
+    const token = jwt.sign(
+      { id: user.id, role: user.role },
+      JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+    res.json({
+  message: "Login successful",
+  token,
+  user: { id: user.id, name: user.name, email: user.email, role: user.role }
+});
 
-    res.json({ message: "Login successful", token });
   });
 });
 
 // ================= START SERVER =================
-app.listen(PORT, () => console.log(`✅ Server running at http://localhost:${PORT}`));
+app.listen(PORT, () =>
+  console.log(`✅ Server running at http://localhost:${PORT}`)
+);
