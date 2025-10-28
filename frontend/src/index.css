@@ -1,0 +1,123 @@
+/* index.css */
+
+/* 🌈 Global Reset */
+body {
+  margin: 0;
+  font-family: "Poppins", sans-serif;
+  background-color: #f8fafc;
+  color: #333;
+}
+
+/* 🧭 Navbar */
+.navbar {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+.nav-link {
+  color: #fff !important;
+  font-weight: 500;
+  transition: color 0.3s, border-bottom 0.3s;
+}
+.nav-link:hover {
+  color: #ffe082 !important;
+  border-bottom: 2px solid #ffe082;
+}
+
+/* 🏠 Home Page */
+.home-wrapper {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0d6efd, #00bcd4);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem;
+}
+
+.home-wrapper h1 {
+  font-size: 2.8rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.forum-section {
+  background: #fff;
+  color: #333;
+  padding: 2rem;
+  border-radius: 15px;
+  width: 85%;
+  max-width: 900px;
+  margin-top: 3rem;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+}
+
+.forum-title {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  font-weight: 600;
+}
+
+.forum-box-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  gap: 1rem;
+}
+
+.forum-box {
+  background: #f8f9fa;
+  border-radius: 10px;
+  padding: 1.5rem;
+  width: 260px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.forum-box:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 🎯 Jobs Page */
+.job-card {
+  border: none;
+  border-radius: 10px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.job-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+.job-card .card-body {
+  padding: 1.5rem;
+}
+.job-card .btn {
+  width: 100%;
+}
+
+/* 🧾 Apply Form */
+form {
+  background: #fff;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+form input,
+form select {
+  border-radius: 6px !important;
+}
+form button {
+  width: 100%;
+  margin-top: 1rem;
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-weight: 500;
+  transition: background 0.3s ease;
+}
+form button:hover {
+  background-color: #198754 !important;
+}

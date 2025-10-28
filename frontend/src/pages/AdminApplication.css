@@ -1,0 +1,76 @@
+.admin-applications {
+  max-width: 900px;
+  margin: 50px auto;
+  padding: 25px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.admin-applications h2 {
+  text-align: center;
+  color: #333;
+  margin-bottom: 25px;
+  font-weight: 600;
+}
+
+.loading, .empty {
+  text-align: center;
+  font-size: 1.1em;
+  color: #666;
+}
+
+.app-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fafafa;
+}
+
+.app-table th, .app-table td {
+  padding: 12px 15px;
+  border-bottom: 1px solid #e3e3e3;
+  text-align: center;
+}
+
+.app-table th {
+  background-color: #f7f9fc;
+  font-weight: 600;
+}
+
+.app-table tr:hover {
+  background-color: #f1f7ff;
+  transition: 0.2s;
+}
+
+.status {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+.status.pending {
+  background: #fff9e6;
+  color: #a07800;
+}
+
+.status.approved {
+  background: #e6ffe6;
+  color: #1b7d1b;
+}
+
+.status.rejected {
+  background: #ffe6e6;
+  color: #c00000;
+}
+
+.date-input {
+  padding: 5px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+.date-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 3px rgba(0,123,255,0.4);
+}

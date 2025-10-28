@@ -1,208 +1,324 @@
 const express = require("express");
-const cors = require("cors");
-const mysql = require("mysql2");
-const path = require("path");
+const mysql = require("mysql2/promise");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const cors = require("cors");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
 
 const app = express();
-const PORT = 2000;
-const JWT_SECRET = "mysecretkey";
-
-// ================= JWT AUTH MIDDLEWARE =================
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
-  if (!token) return res.status(401).json({ message: "Access denied" });
-
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ message: "Invalid token" });
-    req.user = user;
-    next();
-  });
-}
-
-// Middleware
-app.use(cors());
 app.use(express.json());
+app.use(cors());
 app.use(express.static(path.join(__dirname, "../public")));
 
-// Connect to MySQL
-const db = mysql.createConnection({
+const SECRET_KEY = "career_site_secret_key";
+
+// ---------------- MySQL Connection ----------------
+const db = mysql.createPool({
   host: "localhost",
   user: "root",
   password: "Sathish@3804",
   database: "career_site",
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
 });
 
-db.connect((err) => {
-  if (err) console.log(err);
-  else console.log("✅ MySQL Connected!");
-});
+(async () => {
+  try {
+    const conn = await db.getConnection();
+    console.log("✅ MySQL Connected Successfully");
+    conn.release();
+  } catch (err) {
+    console.error("❌ MySQL Connection Failed:", err.message);
+  }
+})();
 
-// Sanitizer
-function sanitize(str) {
-  if (!str) return "";
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+// ---------------- File Upload Setup ----------------
+const uploadsDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
+});
+const upload = multer({ storage });
+app.use("/uploads", express.static(uploadsDir));
+
+// ---------------- Middleware ----------------
+function authenticateToken(req, res, next) {
+  const header = req.headers["authorization"];
+  if (!header) return res.status(401).json({ message: "No token provided" });
+
+  const token = header.split(" ")[1] || header;
+  jwt.verify(token, SECRET_KEY, (err, decoded) => {
+    if (err) return res.status(403).json({ message: "Invalid token" });
+    req.user = decoded;
+    next();
+  });
 }
 
-// ================= JOB ROUTES =================
-
-// Get all jobs
-app.get("/api/jobs", (req, res) => {
-  db.query("SELECT * FROM jobs", (err, results) => {
-    if (err) return res.status(500).send(err);
-    res.json(results);
-  });
-});
-
-// Get job by id
-app.get("/api/jobs/:id", (req, res) => {
-  const jobId = parseInt(req.params.id);
-  db.query("SELECT * FROM jobs WHERE id = ?", [jobId], (err, results) => {
-    if (err) return res.status(500).send(err);
-    if (results.length === 0)
-      res.status(404).json({ error: "Job not found" });
-    else res.json(results[0]);
-  });
-});
-
-// ================= APPLY ROUTE =================
-app.post("/api/apply", authenticateToken, (req, res) => {
-  const {
-    jobId,
-    firstName,
-    lastName,
-    email,
-    phone,
-    gender,
-    city,
-    position,
-    startDate,
-    interviewDate,
-    interviewSlot,
-    resume,
-  } = req.body;
-
-  const userId = req.user?.id;
-
-  if (!jobId) {
-    return res.status(400).json({ success: false, message: "Job ID required" });
+// ---------------- AUTH ----------------
+app.post("/api/signup", async (req, res) => {
+  const { name, email, password, role } = req.body;
+  try {
+    const hashed = await bcrypt.hash(password, 10);
+    await db.query(
+      "INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)",
+      [name, email, hashed, role || "user"]
+    );
+    res.json({ message: "Signup successful! Please log in." });
+  } catch (err) {
+    if (err.code === "ER_DUP_ENTRY")
+      return res.status(400).json({ message: "Email already exists!" });
+    console.error("Signup Error:", err);
+    res.status(500).json({ message: "Database error" });
   }
-
-  const query = `
-    INSERT INTO applications 
-    (job_id, user_id, first_name, last_name, email, phone, gender, city, position, start_date, interview_date, interview_slot, resume)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `;
-
-  const values = [
-    jobId,
-    userId,
-    sanitize(firstName),
-    sanitize(lastName),
-    sanitize(email),
-    sanitize(phone),
-    sanitize(gender),
-    sanitize(city),
-    sanitize(position),
-    startDate || null,
-    interviewDate || null,
-    sanitize(interviewSlot),
-    sanitize(resume),
-  ];
-
-  db.query(query, values, (err, result) => {
-    if (err) {
-      console.error("❌ DB Insert Error:", err);
-      return res.status(400).json({ success: false, message: "Something went wrong" });
-    }
-    res.json({ success: true, message: "Application submitted successfully!" });
-  });
 });
 
-// ================= APPLICATIONS ROUTE =================
-app.get("/api/applications", authenticateToken, (req, res) => {
-  const query = `
-    SELECT a.*, j.title AS job_title 
-    FROM applications a
-    JOIN jobs j ON a.job_id = j.id
-    WHERE a.user_id = ?
-    ORDER BY a.id DESC
-  `;
-  db.query(query, [req.user.id], (err, results) => {
-    if (err) {
-      console.error("❌ Fetch Applications Error:", err);
-      return res.status(500).json({ error: "Database error" });
-    }
-    res.json(results);
-  });
-});
-
-// ================= AUTH ROUTES =================
-
-// Signup
-app.post("/api/signup", (req, res) => {
-  const { name, email, password } = req.body;
-  if (!name || !email || !password) {
-    return res.status(400).json({ message: "All fields are required" });
-  }
-
-  const password_hash = bcrypt.hashSync(password, 10);
-
-  db.query(
-    "INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)",
-    [name, email, password_hash],
-    (err, result) => {
-      if (err) {
-        console.error("SQL Error:", err);
-        if (err.code === "ER_DUP_ENTRY") {
-          return res.status(400).json({ message: "Email already registered" });
-        }
-        return res.status(500).json({ message: "Error registering user" });
-      }
-      res.json({ message: "User registered successfully!" });
-    }
-  );
-});
-
-// Login
-app.post("/api/login", (req, res) => {
+app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password)
-    return res.status(400).json({ message: "All fields are required" });
+  try {
+    const [rows] = await db.query("SELECT * FROM users WHERE email = ?", [email]);
+    if (rows.length === 0)
+      return res.status(401).json({ message: "Invalid email or password" });
 
-  db.query("SELECT * FROM users WHERE email = ?", [email], (err, results) => {
-    if (err) return res.status(500).json({ message: "Error logging in" });
-    if (results.length === 0)
-      return res.status(400).json({ message: "User not found" });
-
-    const user = results[0];
-    const isMatch = bcrypt.compareSync(password, user.password_hash);
-
-    if (!isMatch)
-      return res.status(400).json({ message: "Invalid credentials" });
+    const user = rows[0];
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return res.status(401).json({ message: "Invalid email or password" });
 
     const token = jwt.sign(
-      { id: user.id, role: user.role },
-      JWT_SECRET,
-      { expiresIn: "1h" }
+      { id: user.id, name: user.name, email: user.email, role: user.role },
+      SECRET_KEY,
+      { expiresIn: "2h" }
     );
+
     res.json({
-  message: "Login successful",
-  token,
-  user: { id: user.id, name: user.name, email: user.email, role: user.role }
+      message: "Login successful",
+      token,
+      name: user.name,
+      role: user.role,
+      id: user.id,
+    });
+  } catch (err) {
+    console.error("Login Error:", err);
+    res.status(500).json({ message: "Database error" });
+  }
 });
 
-  });
+// ---------------- JOBS ----------------
+
+// ✅ Admin posts a job
+app.post("/api/jobs", authenticateToken, async (req, res) => {
+  if (req.user.role !== "admin")
+    return res.status(403).json({ message: "Only admins can post jobs" });
+
+  const { title, description, company, location } = req.body;
+
+  try {
+    await db.query(
+      "INSERT INTO jobs (title, description, company, location, posted_by) VALUES (?, ?, ?, ?, ?)",
+      [title, description, company, location, req.user.id]
+    );
+    res.status(201).json({ message: "Job posted successfully" });
+  } catch (err) {
+    console.error("Job Post Error:", err);
+    res.status(500).json({ message: "Error posting job" });
+  }
 });
 
-// ================= START SERVER =================
-app.listen(PORT, () =>
-  console.log(`✅ Server running at http://localhost:${PORT}`)
-);
+// ✅ Get all jobs
+app.get("/api/jobs", async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT j.*, u.name AS posted_by_name 
+       FROM jobs j
+       LEFT JOIN users u ON j.posted_by = u.id
+       ORDER BY j.id DESC`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Get Jobs Error:", err);
+    res.status(500).json({ message: "Error fetching jobs" });
+  }
+});
+
+// ✅ Get single job by ID
+app.get("/api/jobs/:id", async (req, res) => {
+  try {
+    const [rows] = await db.query("SELECT * FROM jobs WHERE id = ?", [req.params.id]);
+    if (rows.length === 0)
+      return res.status(404).json({ message: "Job not found" });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("Error fetching job:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ✅ Admin’s posted jobs
+app.get("/api/admin/jobs", authenticateToken, async (req, res) => {
+  if (req.user.role !== "admin")
+    return res.status(403).json({ message: "Access denied" });
+
+  try {
+    const [rows] = await db.query("SELECT * FROM jobs WHERE posted_by = ?", [req.user.id]);
+    res.json(rows);
+  } catch (err) {
+    console.error("Admin Jobs Error:", err);
+    res.status(500).json({ message: "Database error" });
+  }
+});
+
+// ---------------- APPLICATIONS ----------------
+
+// ✅ User applies for a job (supports FormData)
+app.post("/api/apply", authenticateToken, upload.single("resume"), async (req, res) => {
+  try {
+    const { job_id, first_name, last_name, email, phone, city, position } = req.body;
+    const user_id = req.user.id;
+    const resume = req.file ? req.file.filename : null;
+
+    if (!job_id || !user_id) {
+      return res.status(400).json({ message: "Missing job_id or user_id" });
+    }
+
+    await db.query(
+      `INSERT INTO applications 
+        (user_id, job_id, first_name, last_name, email, phone, city, position, resume, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')`,
+      [user_id, job_id, first_name, last_name, email, phone, city, position, resume]
+    );
+
+    res.json({ message: "Application submitted successfully!" });
+  } catch (err) {
+    console.error("❌ Error submitting application:", err);
+    res.status(500).json({ message: "Server error while applying." });
+  }
+});
+
+// ✅ Get applications for logged-in user
+app.get("/api/applications", authenticateToken, async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT a.id, j.title AS job_title, a.status, 
+              COALESCE(DATE_FORMAT(a.interview_date, '%Y-%m-%d'), 'Pending') AS interview_date
+       FROM applications a
+       JOIN jobs j ON a.job_id = j.id
+       WHERE a.user_id = ?`,
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Error fetching applications:", err);
+    res.status(500).json({ message: "Server error fetching applications" });
+  }
+});
+
+// ✅ Admin - View all applications with applicant details
+app.get("/api/admin/applications", authenticateToken, async (req, res) => {
+  if (req.user.role !== "admin") 
+    return res.status(403).json({ message: "Access denied" });
+
+  try {
+    const [rows] = await db.query(`
+      SELECT 
+        a.id,
+        a.first_name,
+        a.last_name,
+        a.email,
+        j.title AS job_title,
+        a.status,
+        COALESCE(DATE_FORMAT(a.interview_date, '%Y-%m-%d'), '') AS interview_date
+      FROM applications a
+      JOIN jobs j ON a.job_id = j.id
+      ORDER BY a.id DESC
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error("Error fetching admin applications:", err);
+    res.status(500).json({ message: "Server error fetching applications" });
+  }
+});
+
+
+// ✅ Admin - Update application status (final working version)
+app.put("/api/admin/applications/:id/status", authenticateToken, async (req, res) => {
+  if (req.user.role !== "admin")
+    return res.status(403).json({ message: "Access denied" });
+
+  const { id } = req.params;
+  let { status } = req.body;
+
+  // 🟡 Debug log
+  console.log("🟡 Update request received:", { id, status });
+  console.log("🔍 Type check:", typeof status, JSON.stringify(status));
+
+  if (!status) {
+    console.log("❌ Missing status in body");
+    return res.status(400).json({ message: "Status is required" });
+  }
+
+  // ✅ Validate allowed ENUM values
+  if (!["Pending", "Approved", "Rejected"].includes(status.trim())) {
+    console.log("❌ Invalid status value:", status);
+    return res.status(400).json({ message: "Invalid status value" });
+  }
+
+  try {
+    const [result] = await db.query(
+      "UPDATE applications SET status = ? WHERE id = ?",
+      [status.trim(), id]
+    );
+    console.log("✅ SQL Result:", result);
+
+    if (result.affectedRows === 0) {
+      console.log("⚠️ Application not found for ID:", id);
+      return res.status(404).json({ message: "Application not found" });
+    }
+
+    res.json({ message: "Status updated successfully" });
+  } catch (err) {
+    console.error("❌ Error updating application status:", err);
+    res.status(500).json({ message: "Server error while updating status" });
+  }
+});
+
+
+
+
+// ✅ Admin - Update only interview date
+app.put("/api/admin/applications/:id/interview-date", authenticateToken, async (req, res) => {
+  if (req.user.role !== "admin") return res.status(403).json({ message: "Access denied" });
+
+  const { interview_date } = req.body;
+  const { id } = req.params;
+
+  try {
+    await db.query(
+      `UPDATE applications SET interview_date = ? WHERE id = ?`,
+      [interview_date, id]
+    );
+    res.json({ message: "Interview date updated successfully" });
+  } catch (err) {
+    console.error("❌ Error updating interview date:", err);
+    res.status(500).json({ message: "Server error while updating interview date." });
+  }
+});
+
+
+
+// ---------------- Frontend Serve ----------------
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "../public", "index.html"));
+});
+
+// ---------------- Error Handler ----------------
+app.use(/^\/api\//, (req, res) => {
+  res.status(404).json({ message: "API route not found" });
+});
+
+// ---------------- Server Start ----------------
+const PORT = 5000;
+app.listen(PORT, () => console.log(`✅ Server running at http://localhost:${PORT}`));
