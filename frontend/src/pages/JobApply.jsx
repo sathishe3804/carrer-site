@@ -15,7 +15,7 @@ export default function JobApply() {
     city: "",
     position: "",
     start_date: "",
-    resume: "",
+    resume: null, // file upload
   });
   const [loading, setLoading] = useState(false);
 
@@ -33,10 +33,15 @@ export default function JobApply() {
       });
   }, [id]);
 
-  const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    const { name, value, files } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: files ? files[0] : value, // handle file input
+    }));
+  };
 
-  // ✅ Apply for job
+  // ✅ Apply for job (file upload enabled)
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!token) {
@@ -45,15 +50,18 @@ export default function JobApply() {
       return;
     }
 
+    const formData = new FormData();
+    Object.entries(form).forEach(([key, value]) => {
+      if (value) formData.append(key, value);
+    });
+    formData.append("job_id", id);
+
     setLoading(true);
     try {
       const res = await fetch("http://localhost:5000/api/apply", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ ...form, job_id: id }),
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
       });
 
       const data = await res.json();
@@ -79,7 +87,7 @@ export default function JobApply() {
         <strong>{job.company}</strong> • {job.location}
       </p>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} encType="multipart/form-data">
         <div className="row">
           <div className="col-md-6 mb-2">
             <input
@@ -140,18 +148,17 @@ export default function JobApply() {
           onChange={handleChange}
         />
 
+        <label className="form-label">Upload Resume (PDF/DOC)</label>
         <input
+          type="file"
           name="resume"
-          placeholder="Resume link (optional)"
+          accept=".pdf,.doc,.docx"
           className="form-control mb-3"
           onChange={handleChange}
+          required
         />
 
-        <button
-          type="submit"
-          className="btn btn-success"
-          disabled={loading}
-        >
+        <button type="submit" className="btn btn-success" disabled={loading}>
           {loading ? "Applying..." : "Submit Application"}
         </button>
       </form>

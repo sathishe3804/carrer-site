@@ -128,8 +128,8 @@ app.post("/api/jobs", authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ Get all jobs
-app.get("/api/jobs", async (req, res) => {
+// ✅ Get all jobs (for logged-in users)
+app.get("/api/jobs", authenticateToken, async (req, res) => {
   try {
     const [rows] = await db.query(
       `SELECT j.*, u.name AS posted_by_name 
@@ -144,7 +144,7 @@ app.get("/api/jobs", async (req, res) => {
   }
 });
 
-// ✅ Get single job by ID
+// ✅ Get single job
 app.get("/api/jobs/:id", async (req, res) => {
   try {
     const [rows] = await db.query("SELECT * FROM jobs WHERE id = ?", [req.params.id]);
@@ -157,7 +157,7 @@ app.get("/api/jobs/:id", async (req, res) => {
   }
 });
 
-// ✅ Admin’s posted jobs
+// ✅ Admin’s own jobs
 app.get("/api/admin/jobs", authenticateToken, async (req, res) => {
   if (req.user.role !== "admin")
     return res.status(403).json({ message: "Access denied" });
@@ -173,16 +173,15 @@ app.get("/api/admin/jobs", authenticateToken, async (req, res) => {
 
 // ---------------- APPLICATIONS ----------------
 
-// ✅ User applies for a job (supports FormData)
+// ✅ User applies for a job
 app.post("/api/apply", authenticateToken, upload.single("resume"), async (req, res) => {
   try {
     const { job_id, first_name, last_name, email, phone, city, position } = req.body;
     const user_id = req.user.id;
     const resume = req.file ? req.file.filename : null;
 
-    if (!job_id || !user_id) {
+    if (!job_id || !user_id)
       return res.status(400).json({ message: "Missing job_id or user_id" });
-    }
 
     await db.query(
       `INSERT INTO applications 
@@ -193,12 +192,12 @@ app.post("/api/apply", authenticateToken, upload.single("resume"), async (req, r
 
     res.json({ message: "Application submitted successfully!" });
   } catch (err) {
-    console.error("❌ Error submitting application:", err);
+    console.error("Error submitting application:", err);
     res.status(500).json({ message: "Server error while applying." });
   }
 });
 
-// ✅ Get applications for logged-in user
+// ✅ User - View their applications
 app.get("/api/applications", authenticateToken, async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -216,9 +215,9 @@ app.get("/api/applications", authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ Admin - View all applications with applicant details
+// ✅ Admin - View only applications for their own jobs
 app.get("/api/admin/applications", authenticateToken, async (req, res) => {
-  if (req.user.role !== "admin") 
+  if (req.user.role !== "admin")
     return res.status(403).json({ message: "Access denied" });
 
   try {
@@ -233,8 +232,10 @@ app.get("/api/admin/applications", authenticateToken, async (req, res) => {
         COALESCE(DATE_FORMAT(a.interview_date, '%Y-%m-%d'), '') AS interview_date
       FROM applications a
       JOIN jobs j ON a.job_id = j.id
+      WHERE j.posted_by = ?  -- ✅ Only jobs created by this admin
       ORDER BY a.id DESC
-    `);
+    `, [req.user.id]);
+    
     res.json(rows);
   } catch (err) {
     console.error("Error fetching admin applications:", err);
@@ -243,7 +244,7 @@ app.get("/api/admin/applications", authenticateToken, async (req, res) => {
 });
 
 
-// ✅ Admin - Update application status (final working version)
+// ✅ Admin - Update application status
 app.put("/api/admin/applications/:id/status", authenticateToken, async (req, res) => {
   if (req.user.role !== "admin")
     return res.status(403).json({ message: "Access denied" });
@@ -251,46 +252,32 @@ app.put("/api/admin/applications/:id/status", authenticateToken, async (req, res
   const { id } = req.params;
   let { status } = req.body;
 
-  // 🟡 Debug log
-  console.log("🟡 Update request received:", { id, status });
-  console.log("🔍 Type check:", typeof status, JSON.stringify(status));
+  if (!status) return res.status(400).json({ message: "Status is required" });
+  status = status.trim();
 
-  if (!status) {
-    console.log("❌ Missing status in body");
-    return res.status(400).json({ message: "Status is required" });
-  }
-
-  // ✅ Validate allowed ENUM values
-  if (!["Pending", "Approved", "Rejected"].includes(status.trim())) {
-    console.log("❌ Invalid status value:", status);
+  const allowed = ["Pending", "Accepted", "Rejected"];
+  if (!allowed.includes(status))
     return res.status(400).json({ message: "Invalid status value" });
-  }
 
   try {
     const [result] = await db.query(
       "UPDATE applications SET status = ? WHERE id = ?",
-      [status.trim(), id]
+      [status, id]
     );
-    console.log("✅ SQL Result:", result);
-
-    if (result.affectedRows === 0) {
-      console.log("⚠️ Application not found for ID:", id);
+    if (result.affectedRows === 0)
       return res.status(404).json({ message: "Application not found" });
-    }
 
     res.json({ message: "Status updated successfully" });
   } catch (err) {
-    console.error("❌ Error updating application status:", err);
+    console.error("Database error:", err);
     res.status(500).json({ message: "Server error while updating status" });
   }
 });
 
-
-
-
-// ✅ Admin - Update only interview date
+// ✅ Admin - Update interview date
 app.put("/api/admin/applications/:id/interview-date", authenticateToken, async (req, res) => {
-  if (req.user.role !== "admin") return res.status(403).json({ message: "Access denied" });
+  if (req.user.role !== "admin")
+    return res.status(403).json({ message: "Access denied" });
 
   const { interview_date } = req.body;
   const { id } = req.params;
@@ -302,12 +289,10 @@ app.put("/api/admin/applications/:id/interview-date", authenticateToken, async (
     );
     res.json({ message: "Interview date updated successfully" });
   } catch (err) {
-    console.error("❌ Error updating interview date:", err);
+    console.error("Error updating interview date:", err);
     res.status(500).json({ message: "Server error while updating interview date." });
   }
 });
-
-
 
 // ---------------- Frontend Serve ----------------
 app.get("/", (req, res) => {

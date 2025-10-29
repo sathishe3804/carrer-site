@@ -1,20 +1,38 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function Jobs() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const token = localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user"));
+  const navigate = useNavigate();
 
   useEffect(() => {
+    // 🚫 If no token, redirect guest to login
+    if (!token) {
+      alert("Please log in to view available jobs.");
+      navigate("/login");
+      return;
+    }
+
     const endpoint =
       user?.role === "admin"
         ? "http://localhost:5000/api/admin/jobs"
         : "http://localhost:5000/api/jobs";
 
     fetch(endpoint, { headers: { Authorization: `Bearer ${token}` } })
-      .then((res) => res.json())
+      .then(async (res) => {
+        if (res.status === 401) {
+          alert("Session expired or unauthorized. Please log in again.");
+          navigate("/login");
+          return [];
+        }
+        if (!res.ok) {
+          throw new Error(`Error: ${res.status}`);
+        }
+        return res.json();
+      })
       .then((data) => {
         setJobs(Array.isArray(data) ? data : []);
         setLoading(false);
@@ -23,13 +41,14 @@ export default function Jobs() {
         console.error("Error fetching jobs:", err);
         setLoading(false);
       });
-  }, [user, token]);
+  }, [user, token, navigate]);
 
   if (loading) return <p className="text-center">Loading jobs...</p>;
 
   return (
     <div className="container mt-4">
       <h2 className="text-center mb-4">Job Listings</h2>
+
       {jobs.length === 0 ? (
         <p className="text-center">No jobs available.</p>
       ) : (
@@ -46,15 +65,16 @@ export default function Jobs() {
                     {job.description?.substring(0, 100)}...
                   </p>
 
-                  {user?.role !== "admin" ? (
+                  {/* 🧠 Apply button logic */}
+                  {user?.role === "admin" ? (
+                    <span className="badge bg-success mt-3">Posted by You</span>
+                  ) : (
                     <Link
                       to={`/jobs/${job.id}/apply`}
                       className="btn btn-primary mt-2"
                     >
                       Apply Now
                     </Link>
-                  ) : (
-                    <span className="badge bg-success mt-3">Posted by You</span>
                   )}
                 </div>
               </div>

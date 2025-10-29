@@ -98,17 +98,18 @@ export default function AdminDashboard() {
       </form>
 
       {/* ✅ Jobs List */}
-      {jobs.length === 0 ? (
-        <p>No jobs posted yet.</p>
-      ) : (
-        <ul className="list-group mt-3">
-          {jobs.map(job => (
-            <li key={job.id} className="list-group-item">
-              <strong>{job.title}</strong> — {job.company} ({job.location})
-            </li>
-          ))}
-        </ul>
-      )}
+{Array.isArray(jobs) && jobs.length > 0 ? (
+  <ul className="list-group mt-3">
+    {jobs.map((job) => (
+      <li key={job.id} className="list-group-item">
+        <strong>{job.title}</strong> — {job.company} ({job.location})
+      </li>
+    ))}
+  </ul>
+) : (
+  <p>No jobs posted yet.</p>
+)}
+
     </div>
   );
 }
