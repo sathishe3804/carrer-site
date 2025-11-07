@@ -11,7 +11,7 @@ const fs = require("fs");
 const app = express();
 app.use(express.json());
 app.use(cors());
-app.use(express.static(path.join(__dirname, "../public")));
+// app.use(express.static(path.join(__dirname, "../public")));
 
 const SECRET_KEY = "career_site_secret_key";
 
@@ -297,10 +297,10 @@ app.put("/api/admin/applications/:id/interview-date", authenticateToken, async (
   }
 });
 
-// ---------------- Frontend Serve ----------------
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "../public", "index.html"));
-});
+// // ---------------- Frontend Serve ----------------
+// app.get("/", (req, res) => {
+//   res.sendFile(path.join(__dirname, "../public", "index.html"));
+// });
 
 // ---------------- Error Handler ----------------
 app.use(/^\/api\//, (req, res) => {
