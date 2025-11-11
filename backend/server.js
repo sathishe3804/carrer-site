@@ -11,22 +11,20 @@ const fs = require("fs");
 const app = express();
 app.use(express.json());
 app.use(cors());
-// app.use(express.static(path.join(__dirname, "../public")));
 
 const SECRET_KEY = "career_site_secret_key";
 
 // ---------------- MySQL Connection ----------------
 const db = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+  host: process.env.MYSQL_HOST,
+  user: process.env.MYSQL_USER,
+  password: process.env.MYSQL_PASSWORD,
+  database: process.env.MYSQL_DATABASE,
+  port: process.env.MYSQL_PORT,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
 });
-
-
 
 (async () => {
   try {
@@ -111,8 +109,6 @@ app.post("/api/login", async (req, res) => {
 });
 
 // ---------------- JOBS ----------------
-
-// ✅ Admin posts a job
 app.post("/api/jobs", authenticateToken, async (req, res) => {
   if (req.user.role !== "admin")
     return res.status(403).json({ message: "Only admins can post jobs" });
@@ -131,7 +127,6 @@ app.post("/api/jobs", authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ Get all jobs (for logged-in users)
 app.get("/api/jobs", authenticateToken, async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -147,7 +142,6 @@ app.get("/api/jobs", authenticateToken, async (req, res) => {
   }
 });
 
-// ✅ Get single job
 app.get("/api/jobs/:id", async (req, res) => {
   try {
     const [rows] = await db.query("SELECT * FROM jobs WHERE id = ?", [req.params.id]);
@@ -160,23 +154,7 @@ app.get("/api/jobs/:id", async (req, res) => {
   }
 });
 
-// ✅ Admin’s own jobs
-app.get("/api/admin/jobs", authenticateToken, async (req, res) => {
-  if (req.user.role !== "admin")
-    return res.status(403).json({ message: "Access denied" });
-
-  try {
-    const [rows] = await db.query("SELECT * FROM jobs WHERE posted_by = ?", [req.user.id]);
-    res.json(rows);
-  } catch (err) {
-    console.error("Admin Jobs Error:", err);
-    res.status(500).json({ message: "Database error" });
-  }
-});
-
 // ---------------- APPLICATIONS ----------------
-
-// ✅ User applies for a job
 app.post("/api/apply", authenticateToken, upload.single("resume"), async (req, res) => {
   try {
     const { job_id, first_name, last_name, email, phone, city, position } = req.body;
@@ -200,113 +178,11 @@ app.post("/api/apply", authenticateToken, upload.single("resume"), async (req, r
   }
 });
 
-// ✅ User - View their applications
-app.get("/api/applications", authenticateToken, async (req, res) => {
-  try {
-    const [rows] = await db.query(
-      `SELECT a.id, j.title AS job_title, a.status, 
-              COALESCE(DATE_FORMAT(a.interview_date, '%Y-%m-%d'), 'Pending') AS interview_date
-       FROM applications a
-       JOIN jobs j ON a.job_id = j.id
-       WHERE a.user_id = ?`,
-      [req.user.id]
-    );
-    res.json(rows);
-  } catch (err) {
-    console.error("Error fetching applications:", err);
-    res.status(500).json({ message: "Server error fetching applications" });
-  }
-});
-
-// ✅ Admin - View only applications for their own jobs
-app.get("/api/admin/applications", authenticateToken, async (req, res) => {
-  if (req.user.role !== "admin")
-    return res.status(403).json({ message: "Access denied" });
-
-  try {
-    const [rows] = await db.query(`
-      SELECT 
-        a.id,
-        a.first_name,
-        a.last_name,
-        a.email,
-        j.title AS job_title,
-        a.status,
-        COALESCE(DATE_FORMAT(a.interview_date, '%Y-%m-%d'), '') AS interview_date
-      FROM applications a
-      JOIN jobs j ON a.job_id = j.id
-      WHERE j.posted_by = ?  -- ✅ Only jobs created by this admin
-      ORDER BY a.id DESC
-    `, [req.user.id]);
-    
-    res.json(rows);
-  } catch (err) {
-    console.error("Error fetching admin applications:", err);
-    res.status(500).json({ message: "Server error fetching applications" });
-  }
-});
-
-
-// ✅ Admin - Update application status
-app.put("/api/admin/applications/:id/status", authenticateToken, async (req, res) => {
-  if (req.user.role !== "admin")
-    return res.status(403).json({ message: "Access denied" });
-
-  const { id } = req.params;
-  let { status } = req.body;
-
-  if (!status) return res.status(400).json({ message: "Status is required" });
-  status = status.trim();
-
-  const allowed = ["Pending", "Accepted", "Rejected"];
-  if (!allowed.includes(status))
-    return res.status(400).json({ message: "Invalid status value" });
-
-  try {
-    const [result] = await db.query(
-      "UPDATE applications SET status = ? WHERE id = ?",
-      [status, id]
-    );
-    if (result.affectedRows === 0)
-      return res.status(404).json({ message: "Application not found" });
-
-    res.json({ message: "Status updated successfully" });
-  } catch (err) {
-    console.error("Database error:", err);
-    res.status(500).json({ message: "Server error while updating status" });
-  }
-});
-
-// ✅ Admin - Update interview date
-app.put("/api/admin/applications/:id/interview-date", authenticateToken, async (req, res) => {
-  if (req.user.role !== "admin")
-    return res.status(403).json({ message: "Access denied" });
-
-  const { interview_date } = req.body;
-  const { id } = req.params;
-
-  try {
-    await db.query(
-      `UPDATE applications SET interview_date = ? WHERE id = ?`,
-      [interview_date, id]
-    );
-    res.json({ message: "Interview date updated successfully" });
-  } catch (err) {
-    console.error("Error updating interview date:", err);
-    res.status(500).json({ message: "Server error while updating interview date." });
-  }
-});
-
-// // ---------------- Frontend Serve ----------------
-// app.get("/", (req, res) => {
-//   res.sendFile(path.join(__dirname, "../public", "index.html"));
-// });
-
 // ---------------- Error Handler ----------------
 app.use(/^\/api\//, (req, res) => {
   res.status(404).json({ message: "API route not found" });
 });
 
 // ---------------- Server Start ----------------
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`✅ Server running at http://localhost:${PORT}`));
