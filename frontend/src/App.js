@@ -12,7 +12,10 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminApplications from "./pages/AdminApplications";
 
 // ✅ Import the default export
-import API_BASE_URL from "./config";
+
+// ✅ Named import
+import { API_BASE_URL } from "./config";
+
 
 export default function App() {
   console.log("Backend API URL:", API_BASE_URL); // Optional for testing
