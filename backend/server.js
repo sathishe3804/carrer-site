@@ -1,7 +1,6 @@
 // ---------------------------
 // ✅ Load environment variables
 // ---------------------------
-// Load .env only in local (not in Railway)
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
@@ -23,7 +22,18 @@ const fs = require("fs");
 // ---------------------------
 const app = express();
 app.use(express.json());
-app.use(cors());
+
+// ✅ Enable CORS for both local & Netlify frontend
+app.use(
+  cors({
+    origin: [
+      "https://sathishe.netlify.app", // ✅ Netlify domain
+      "http://localhost:3000",        // ✅ Local testing
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  })
+);
 
 const SECRET_KEY = "career_site_secret_key";
 
@@ -32,7 +42,6 @@ const SECRET_KEY = "career_site_secret_key";
 // ---------------------------
 const isProduction = process.env.NODE_ENV === "production";
 
-// ✅ For Railway, use your actual Railway host
 const db = mysql.createPool({
   host: isProduction ? "yamabiko.proxy.rlwy.net" : process.env.MYSQL_HOST,
   user: isProduction ? "root" : process.env.MYSQL_USER,
@@ -139,6 +148,8 @@ app.post("/api/login", async (req, res) => {
 // ---------------------------
 // ✅ JOB ROUTES
 // ---------------------------
+
+// ➤ Post new job (Admin only)
 app.post("/api/jobs", authenticateToken, async (req, res) => {
   if (req.user.role !== "admin")
     return res.status(403).json({ message: "Only admins can post jobs" });
@@ -157,6 +168,7 @@ app.post("/api/jobs", authenticateToken, async (req, res) => {
   }
 });
 
+// ➤ Get all jobs (For users)
 app.get("/api/jobs", authenticateToken, async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -172,6 +184,24 @@ app.get("/api/jobs", authenticateToken, async (req, res) => {
   }
 });
 
+// ➤ Get jobs by admin (only their own)
+app.get("/api/admin/jobs", authenticateToken, async (req, res) => {
+  if (req.user.role !== "admin")
+    return res.status(403).json({ message: "Only admins allowed" });
+
+  try {
+    const [rows] = await db.query(
+      "SELECT * FROM jobs WHERE posted_by = ? ORDER BY id DESC",
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Get Admin Jobs Error:", err);
+    res.status(500).json({ message: "Error fetching admin jobs" });
+  }
+});
+
+// ➤ Get job by ID
 app.get("/api/jobs/:id", async (req, res) => {
   try {
     const [rows] = await db.query("SELECT * FROM jobs WHERE id = ?", [req.params.id]);
@@ -187,6 +217,8 @@ app.get("/api/jobs/:id", async (req, res) => {
 // ---------------------------
 // ✅ APPLICATION ROUTES
 // ---------------------------
+
+// ➤ Apply for a job (User)
 app.post("/api/apply", authenticateToken, upload.single("resume"), async (req, res) => {
   try {
     const { job_id, first_name, last_name, email, phone, city, position } = req.body;
@@ -207,6 +239,43 @@ app.post("/api/apply", authenticateToken, upload.single("resume"), async (req, r
   } catch (err) {
     console.error("Error submitting application:", err);
     res.status(500).json({ message: "Server error while applying." });
+  }
+});
+
+// ➤ Get user's applications
+app.get("/api/applications", authenticateToken, async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT a.*, j.title AS job_title 
+       FROM applications a
+       LEFT JOIN jobs j ON a.job_id = j.id
+       WHERE a.user_id = ?`,
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Error fetching user applications:", err);
+    res.status(500).json({ message: "Error fetching applications" });
+  }
+});
+
+// ➤ Get all applications (Admin)
+app.get("/api/admin/applications", authenticateToken, async (req, res) => {
+  if (req.user.role !== "admin")
+    return res.status(403).json({ message: "Only admins allowed" });
+
+  try {
+    const [rows] = await db.query(
+      `SELECT a.*, j.title AS job_title, u.name AS applicant_name 
+       FROM applications a
+       LEFT JOIN jobs j ON a.job_id = j.id
+       LEFT JOIN users u ON a.user_id = u.id
+       ORDER BY a.id DESC`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Error fetching admin applications:", err);
+    res.status(500).json({ message: "Error fetching admin applications" });
   }
 });
 
