@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
+import { API_BASE_URL } from "../config"; // ✅ Import backend URL
 
 export default function Signup() {
   const [form, setForm] = useState({
@@ -21,7 +22,7 @@ export default function Signup() {
     setError("");
 
     try {
-      const res = await axios.post("http://localhost:5000/api/signup", form);
+      const res = await axios.post(`${API_BASE_URL}/api/signup`, form);
       alert(res.data.message || "Signup successful!");
       navigate("/login");
     } catch (err) {

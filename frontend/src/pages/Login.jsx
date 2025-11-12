@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
+import { API_BASE_URL } from "../config"; // ✅ Import backend URL
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -13,12 +14,11 @@ export default function Login() {
     setError("");
 
     try {
-      const res = await axios.post("http://localhost:5000/api/login", {
+      const res = await axios.post(`${API_BASE_URL}/api/login`, {
         email,
         password,
       });
 
-      // Store token + user in localStorage
       localStorage.setItem("token", res.data.token);
       localStorage.setItem(
         "user",
@@ -30,8 +30,6 @@ export default function Login() {
       );
 
       alert("Login successful!");
-
-      // Redirect to home page
       navigate("/");
     } catch (err) {
       console.error("Login error:", err);

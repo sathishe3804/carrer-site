@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import "./AdminApplication.css";
+import { API_BASE_URL } from "../config";
 
 export default function AdminApplications() {
   const [applications, setApplications] = useState([]);

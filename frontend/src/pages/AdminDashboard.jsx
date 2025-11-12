@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { API_BASE_URL } from "../config";
 
 export default function AdminDashboard() {
   const [jobs, setJobs] = useState([]);

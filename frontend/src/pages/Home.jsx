@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import "./Home.css";
+import { API_BASE_URL } from "../config";
 
 export default function Home() {
   const user = JSON.parse(localStorage.getItem("user"));
