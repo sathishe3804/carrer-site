@@ -1,7 +1,14 @@
-// Only load .env when running locally (not in Railway)
+// ---------------------------
+// ✅ Load environment variables
+// ---------------------------
+// Load .env only in local (not in Railway)
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
+
+// ---------------------------
+// ✅ Imports
+// ---------------------------
 const express = require("express");
 const mysql = require("mysql2/promise");
 const bcrypt = require("bcryptjs");
@@ -11,46 +18,62 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
+// ---------------------------
+// ✅ App setup
+// ---------------------------
 const app = express();
 app.use(express.json());
 app.use(cors());
 
 const SECRET_KEY = "career_site_secret_key";
 
-// ---------------- MySQL Connection ----------------
+// ---------------------------
+// ✅ MySQL Connection Setup
+// ---------------------------
+const isProduction = process.env.NODE_ENV === "production";
+
+// ✅ For Railway, use your actual Railway host
 const db = mysql.createPool({
-  host: process.env.MYSQL_HOST,
-  user: process.env.MYSQL_USER,
-  password: process.env.MYSQL_PASSWORD,
-  database: process.env.MYSQL_DATABASE,
-  port: process.env.MYSQL_PORT,
+  host: isProduction ? "yamabiko.proxy.rlwy.net" : process.env.MYSQL_HOST,
+  user: isProduction ? "root" : process.env.MYSQL_USER,
+  password: isProduction ? "eWZleokvboHemelllZYqcDnaedmirUYQ" : process.env.MYSQL_PASSWORD,
+  database: isProduction ? "railway" : process.env.MYSQL_DATABASE,
+  port: isProduction ? 41763 : process.env.MYSQL_PORT,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
 });
 
+// ✅ Test DB connection
 (async () => {
   try {
     const conn = await db.getConnection();
-    console.log("✅ MySQL Connected Successfully");
+    await conn.ping();
     conn.release();
+    console.log("✅ MySQL Connected Successfully");
   } catch (err) {
     console.error("❌ MySQL Connection Failed:", err.message);
   }
 })();
 
-// ---------------- File Upload Setup ----------------
+// ---------------------------
+// ✅ File Upload Setup
+// ---------------------------
 const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
+  filename: (req, file, cb) =>
+    cb(null, Date.now() + "-" + file.originalname.replace(/\s+/g, "_")),
 });
+
 const upload = multer({ storage });
 app.use("/uploads", express.static(uploadsDir));
 
-// ---------------- Middleware ----------------
+// ---------------------------
+// ✅ JWT Authentication Middleware
+// ---------------------------
 function authenticateToken(req, res, next) {
   const header = req.headers["authorization"];
   if (!header) return res.status(401).json({ message: "No token provided" });
@@ -63,7 +86,9 @@ function authenticateToken(req, res, next) {
   });
 }
 
-// ---------------- AUTH ----------------
+// ---------------------------
+// ✅ AUTH ROUTES
+// ---------------------------
 app.post("/api/signup", async (req, res) => {
   const { name, email, password, role } = req.body;
   try {
@@ -111,7 +136,9 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// ---------------- JOBS ----------------
+// ---------------------------
+// ✅ JOB ROUTES
+// ---------------------------
 app.post("/api/jobs", authenticateToken, async (req, res) => {
   if (req.user.role !== "admin")
     return res.status(403).json({ message: "Only admins can post jobs" });
@@ -157,7 +184,9 @@ app.get("/api/jobs/:id", async (req, res) => {
   }
 });
 
-// ---------------- APPLICATIONS ----------------
+// ---------------------------
+// ✅ APPLICATION ROUTES
+// ---------------------------
 app.post("/api/apply", authenticateToken, upload.single("resume"), async (req, res) => {
   try {
     const { job_id, first_name, last_name, email, phone, city, position } = req.body;
@@ -181,11 +210,21 @@ app.post("/api/apply", authenticateToken, upload.single("resume"), async (req, r
   }
 });
 
-// ---------------- Error Handler ----------------
+// ---------------------------
+// ✅ Default Route & Error Handler
+// ---------------------------
+app.get("/", (req, res) => {
+  res.send("🚀 Career Site backend is running successfully!");
+});
+
 app.use(/^\/api\//, (req, res) => {
   res.status(404).json({ message: "API route not found" });
 });
 
-// ---------------- Server Start ----------------
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`✅ Server running at http://localhost:${PORT}`));
+// ---------------------------
+// ✅ Start Server
+// ---------------------------
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () =>
+  console.log(`✅ Server running at http://localhost:${PORT}`)
+);
