@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { API_BASE_URL } from "../config";
+import { API_BASE_URL } from "../config"; // ✅ Import backend URL
 
 export default function AdminDashboard() {
   const [jobs, setJobs] = useState([]);
@@ -12,10 +12,11 @@ export default function AdminDashboard() {
 
   const token = localStorage.getItem("token");
 
+  // ✅ Fetch jobs for admin
   useEffect(() => {
     if (!token) return;
 
-    fetch("http://localhost:5000/api/admin/jobs", {
+    fetch(`${API_BASE_URL}/api/admin/jobs`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => res.json())
@@ -27,31 +28,40 @@ export default function AdminDashboard() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  // ✅ Post new job
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const res = await fetch("http://localhost:5000/api/jobs", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify(form)
-    });
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/jobs`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(form)
+      });
 
-    if (!res.ok) return alert("Job posting failed");
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to post job");
+      }
 
-    alert("✅ Job posted successfully!");
+      alert("✅ Job posted successfully!");
 
-    // Refresh jobs list
-    fetch("http://localhost:2000/api/admin/jobs", {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(r => r.json())
-      .then(setJobs);
+      // Refresh jobs list
+      fetch(`${API_BASE_URL}/api/admin/jobs`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then(r => r.json())
+        .then(setJobs);
 
-    // clear form
-    setForm({ title: "", company: "", location: "", description: "" });
+      // Clear form
+      setForm({ title: "", company: "", location: "", description: "" });
+    } catch (err) {
+      console.error("Error posting job:", err);
+      alert("❌ Failed to post job. Check console for details.");
+    }
   };
 
   return (
@@ -99,18 +109,17 @@ export default function AdminDashboard() {
       </form>
 
       {/* ✅ Jobs List */}
-{Array.isArray(jobs) && jobs.length > 0 ? (
-  <ul className="list-group mt-3">
-    {jobs.map((job) => (
-      <li key={job.id} className="list-group-item">
-        <strong>{job.title}</strong> — {job.company} ({job.location})
-      </li>
-    ))}
-  </ul>
-) : (
-  <p>No jobs posted yet.</p>
-)}
-
+      {Array.isArray(jobs) && jobs.length > 0 ? (
+        <ul className="list-group mt-3">
+          {jobs.map((job) => (
+            <li key={job.id} className="list-group-item">
+              <strong>{job.title}</strong> — {job.company} ({job.location})
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>No jobs posted yet.</p>
+      )}
     </div>
   );
 }

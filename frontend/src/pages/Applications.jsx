@@ -14,7 +14,7 @@ export default function Applications() {
       return;
     }
 
-    fetch("http://localhost:5000/api/applications", {
+    fetch(`${API_BASE_URL}/api/applications`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(async (res) => {
@@ -25,12 +25,8 @@ export default function Applications() {
         return res.json();
       })
       .then((data) => {
-        if (Array.isArray(data)) {
-          setApplications(data);
-        } else {
-          console.error("Invalid API response:", data);
-          setApplications([]);
-        }
+        if (Array.isArray(data)) setApplications(data);
+        else setApplications([]);
       })
       .catch((err) => {
         console.error("Error loading applications:", err);
@@ -47,9 +43,7 @@ export default function Applications() {
       <h2 className="mb-3 text-center">My Applications</h2>
 
       {applications.length === 0 ? (
-        <div className="alert alert-info text-center">
-          No applications found.
-        </div>
+        <div className="alert alert-info text-center">No applications found.</div>
       ) : (
         <table className="table table-hover shadow-sm border rounded">
           <thead className="table-dark">

@@ -10,7 +10,6 @@ export default function Jobs() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // 🚫 If no token, redirect guest to login
     if (!token) {
       alert("Please log in to view available jobs.");
       navigate("/login");
@@ -19,8 +18,8 @@ export default function Jobs() {
 
     const endpoint =
       user?.role === "admin"
-        ? "http://localhost:5000/api/admin/jobs"
-        : "http://localhost:5000/api/jobs";
+        ? `${API_BASE_URL}/api/admin/jobs`
+        : `${API_BASE_URL}/api/jobs`;
 
     fetch(endpoint, { headers: { Authorization: `Bearer ${token}` } })
       .then(async (res) => {
@@ -29,19 +28,12 @@ export default function Jobs() {
           navigate("/login");
           return [];
         }
-        if (!res.ok) {
-          throw new Error(`Error: ${res.status}`);
-        }
+        if (!res.ok) throw new Error(`Error: ${res.status}`);
         return res.json();
       })
-      .then((data) => {
-        setJobs(Array.isArray(data) ? data : []);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Error fetching jobs:", err);
-        setLoading(false);
-      });
+      .then((data) => setJobs(Array.isArray(data) ? data : []))
+      .catch((err) => console.error("Error fetching jobs:", err))
+      .finally(() => setLoading(false));
   }, [user, token, navigate]);
 
   if (loading) return <p className="text-center">Loading jobs...</p>;
@@ -49,7 +41,6 @@ export default function Jobs() {
   return (
     <div className="container mt-4">
       <h2 className="text-center mb-4">Job Listings</h2>
-
       {jobs.length === 0 ? (
         <p className="text-center">No jobs available.</p>
       ) : (
@@ -66,14 +57,10 @@ export default function Jobs() {
                     {job.description?.substring(0, 100)}...
                   </p>
 
-                  {/* 🧠 Apply button logic */}
                   {user?.role === "admin" ? (
                     <span className="badge bg-success mt-3">Posted by You</span>
                   ) : (
-                    <Link
-                      to={`/jobs/${job.id}/apply`}
-                      className="btn btn-primary mt-2"
-                    >
+                    <Link to={`/jobs/${job.id}/apply`} className="btn btn-primary mt-2">
                       Apply Now
                     </Link>
                   )}
