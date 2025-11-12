@@ -1,4 +1,4 @@
-import './styles.css';
+import "./styles.css";
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
@@ -11,11 +11,11 @@ import Signup from "./pages/Signup";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminApplications from "./pages/AdminApplications";
 
-// ✅ Import your config file for backend URL
-import { API_BASE_URL } from "./config";
+// ✅ Import the default export
+import API_BASE_URL from "./config";
 
 export default function App() {
-  console.log("Backend API URL:", API_BASE_URL); // Optional, just to verify
+  console.log("Backend API URL:", API_BASE_URL); // Optional for testing
 
   return (
     <Router>
