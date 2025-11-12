@@ -5,7 +5,7 @@ export default function Home() {
   const user = JSON.parse(localStorage.getItem("user"));
   const name = user?.name || "Guest";
 
-  const [showScroll, setShowScroll] = useState(false);
+  const [, setShowScroll] = useState(false);
 
   // Optional: fade-in animation when scrolling
   useEffect(() => {
