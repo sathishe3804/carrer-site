@@ -11,7 +11,12 @@ import Signup from "./pages/Signup";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminApplications from "./pages/AdminApplications";
 
+// ✅ Import your config file for backend URL
+import { API_BASE_URL } from "./config";
+
 export default function App() {
+  console.log("Backend API URL:", API_BASE_URL); // Optional, just to verify
+
   return (
     <Router>
       <Navbar />
